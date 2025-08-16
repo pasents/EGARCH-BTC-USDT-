@@ -1,3 +1,4 @@
+import os
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
@@ -6,12 +7,10 @@ from arch import arch_model
 # =========================
 # === LOAD & PREP DATA ===
 # =========================
-# Parse dates (day-first in your CSV) and use a DateTimeIndex
 df = pd.read_csv("BTCUSDTmergeddataset.csv", parse_dates=['timestamp'], dayfirst=True)
 df = df.sort_values('timestamp').set_index('timestamp')
-df = df[~df.index.duplicated(keep='first')]   # drop any duplicate timestamps
+df = df[~df.index.duplicated(keep='first')]
 
-# Use LOG returns everywhere for consistency
 df['log_return'] = np.log(df['close']).diff()
 df['squared_returns'] = df['log_return'] ** 2
 
@@ -26,22 +25,18 @@ print("Number of missing weeks:", len(missing_weeks))
 # ==================================
 # === EGARCH(1,1) ESTIMATION     ===
 # ==================================
-# Fit EGARCH on percent log-returns
 returns_pct = df['log_return'].dropna() * 100.0
 egarch = arch_model(returns_pct, vol='EGARCH', p=1, o=1, q=1, dist='normal')
 res = egarch.fit(disp='off')
 
-# EGARCH conditional vol is in the same units as input (percent)
-egarch_vol_pct = res.conditional_volatility                   # %
-egarch_vol_raw = egarch_vol_pct / 100.0                       # fraction
+egarch_vol_pct = res.conditional_volatility
+egarch_vol_raw = egarch_vol_pct / 100.0
 egarch_var_raw = egarch_vol_raw ** 2
 
-# Align EGARCH variance back into df by index and keep overlapping rows
 df['egarch_variance'] = np.nan
 df.loc[egarch_var_raw.index, 'egarch_variance'] = egarch_var_raw.values
 df = df.loc[~df['egarch_variance'].isna()].copy()
 
-# Mark variance-breach events (log-return squared vs EGARCH variance)
 df['breach'] = (df['squared_returns'] > df['egarch_variance']).astype(int)
 breaches = df[df['breach'] == 1]
 
@@ -49,43 +44,35 @@ breaches = df[df['breach'] == 1]
 # === STRATEGY IMPLEMENTATION (breach long)
 # ==========================================
 capital = 1.0
-position = 0   # 0 = flat, 1 = long
+position = 0
 buy_price = 0.0
 
-df['signal'] = 0        # 1 = buy, -1 = take profit, -2 = stop
+df['signal'] = 0
 df['equity'] = np.nan
 
 idx = df.index
 for i in range(1, len(df)):
     price = df.loc[idx[i], 'close']
 
-    # Entry: variance breach
     if position == 0 and df.loc[idx[i], 'squared_returns'] > df.loc[idx[i], 'egarch_variance']:
         position = 1
         buy_price = price
         df.loc[idx[i], 'signal'] = 1
 
-    # Take profit: +17%
     elif position == 1 and price >= buy_price * 1.17:
         position = 0
         df.loc[idx[i], 'signal'] = -1
         capital *= (price / buy_price)
 
-    # Stop loss: -3%
     elif position == 1 and price <= buy_price * 0.97:
         position = 0
         df.loc[idx[i], 'signal'] = -2
         capital *= (price / buy_price)
 
-    # Mark-to-market equity
     df.loc[idx[i], 'equity'] = capital if position == 0 else capital * (price / buy_price)
 
-# Forward-fill equity safely
 df['equity'] = df['equity'].ffill()
 
-# ==============================
-# === MARK ENTRIES / EXITS   ===
-# ==============================
 entries = df[df['signal'] == 1]
 exits   = df[df['signal'] == -1]
 stops   = df[df['signal'] == -2]
@@ -156,19 +143,18 @@ equity_returns = df['equity'].pct_change().dropna()
 sr_denom = equity_returns.std()
 sharpe_ratio = (equity_returns.mean() / sr_denom) * np.sqrt(52) if sr_denom and sr_denom > 0 else np.nan
 
-# ================================================
-# === PLOT ENTRIES/EXITS, BREACHES, & EGARCH VAR ==
-# ================================================
+# =======================================
+# === CREATE /images/ AND SAVE PLOTS  ===
+# =======================================
+IMG_DIR = "images"
+os.makedirs(IMG_DIR, exist_ok=True)
+
+# 1. Trade chart
 plt.figure(figsize=(16, 8))
 ax1 = plt.gca()
 ax1.plot(df.index, df['close'], label='BTC Close', color='blue', alpha=0.7)
 
-# Breaches
 ax1.scatter(breaches.index, breaches['close'], color='orange', marker='o', s=60, label='Variance Breach (All)')
-for t in breaches.index:
-    ax1.axvline(t, color='orange', alpha=0.13, linestyle='-', linewidth=2)
-
-# Trades
 ax1.scatter(entries.index, entries['close'], label='Buy (Entry)', color='green', marker='^', s=80)
 ax1.scatter(exits.index,   exits['close'],   label='Sell (+17%)', color='red', marker='v', s=80)
 ax1.scatter(stops.index,   stops['close'],   label='Sell (Stop -3%)', color='black', marker='x', s=80)
@@ -177,11 +163,10 @@ ax1.set_ylabel('BTC Close Price')
 ax1.legend(loc='upper left')
 plt.title("BTC: EGARCH Variance Breach Strategy\nSignals, Trades, and EGARCH Model Variance")
 plt.tight_layout()
-plt.show()
+plt.savefig(os.path.join(IMG_DIR, "egarch_trades.png"), dpi=300, bbox_inches="tight")
+plt.close()
 
-# ===============================
-# === PLOT BOTH EQUITY CURVES ===
-# ===============================
+# 2. Equity curve
 plt.figure(figsize=(14, 6))
 plt.plot(df.index, df['equity'], label='EGARCH Strategy', color='purple', linewidth=2)
 plt.plot(df.index, df['buyhold_equity'], label='Buy & Hold', color='black', linestyle='--', linewidth=2)
@@ -191,44 +176,21 @@ plt.ylabel('Portfolio Value (Normalized)')
 plt.legend()
 plt.grid(True)
 plt.tight_layout()
-plt.show()
+plt.savefig(os.path.join(IMG_DIR, "egarch_equity.png"), dpi=300, bbox_inches="tight")
+plt.close()
 
-# ==============================================
-# === PRINT METRICS SIDE BY SIDE (SUMMARY)   ===
-# ==============================================
-print("\n" + "="*40)
-print("          PERFORMANCE SUMMARY")
-print("="*40)
-print("Metric".ljust(28), "EGARCH".ljust(16), "Buy & Hold")
-print("-"*40)
-print(f"Total Return:".ljust(28), f"{total_return:.2%}".ljust(16), f"{bh_final-1:.2%}")
-print(f"Annualized (CAGR):".ljust(28), f"{(CAGR if pd.notna(CAGR) else float('nan')):.2%}".ljust(16), f"{(bh_cagr if pd.notna(bh_cagr) else float('nan')):.2%}")
-print(f"Sharpe Ratio:".ljust(28), f"{(sharpe_ratio if pd.notna(sharpe_ratio) else float('nan')):.2f}".ljust(16), f"{(bh_sharpe if pd.notna(bh_sharpe) else float('nan')):.2f}")
-print(f"Max Drawdown:".ljust(28), f"{max_drawdown:.2%}".ljust(16), f"{bh_maxdd:.2%}")
-print("-"*40)
-print(f"Total trades:".ljust(28), f"{total_trades}")
-print(f"Win rate:".ljust(28), f"{(win_rate if pd.notna(win_rate) else float('nan')):.2%}")
-print("="*40 + "\n")
+# 3. Drawdowns
+plt.figure(figsize=(14, 4))
+plt.plot(drawdown.index, drawdown, color='red')
+plt.title("EGARCH Strategy – Drawdowns")
+plt.xlabel("Date")
+plt.ylabel("Drawdown")
+plt.grid(True)
+plt.tight_layout()
+plt.savefig(os.path.join(IMG_DIR, "egarch_drawdown.png"), dpi=300, bbox_inches="tight")
+plt.close()
 
-# =======================================================
-# === STRATEGY METRICS IN DETAIL + RETURNS/VOL PLOT   ===
-# =======================================================
-print("\n" + "="*40)
-print("   EGARCH VARIANCE BREACH STRATEGY METRICS")
-print("="*40)
-print(f"Total trades:              {total_trades}")
-print(f"Profitable exits (+17%):   {len(profitable)}")
-print(f"Stopped out (-3%):         {len(stopped)}")
-print(f"Win rate:                  {(win_rate if pd.notna(win_rate) else float('nan')):.2%}")
-print(f"Average P&L per trade:     {(avg_pnl if pd.notna(avg_pnl) else float('nan')):.2%}")
-print(f"Total return:              {total_return:.2%}")
-print(f"Annualized return (CAGR):  {(CAGR if pd.notna(CAGR) else float('nan')):.2%}")
-print(f"Maximum drawdown:          {max_drawdown:.2%}")
-print(f"Sharpe ratio:              {(sharpe_ratio if pd.notna(sharpe_ratio) else float('nan')):.2f}")
-print("="*40 + "\n")
-
-# Academic-style Returns & Volatility Plot
-# (Vol series aligned on df's index for plotting continuity)
+# 4. Returns vs EGARCH Vol
 egarch_vol_plot = res.conditional_volatility.reindex(df.index).ffill()
 plt.figure(figsize=(14, 6))
 plt.plot(df.index, df['log_return'] * 100.0, color='grey', alpha=0.5, label='Log Returns × 100')
@@ -238,4 +200,7 @@ plt.xlabel('Date')
 plt.ylabel('Log Return / Volatility (%)')
 plt.legend()
 plt.tight_layout()
-plt.show()
+plt.savefig(os.path.join(IMG_DIR, "egarch_volatility.png"), dpi=300, bbox_inches="tight")
+plt.close()
+
+print("\nSaved plots to:", IMG_DIR)

@@ -104,3 +104,17 @@ This project is **not** financial advice. Use at your own risk.
 # EGARCH-BTC-USDT-
 Backtests a BTC/USDT volatility strategy. Loads BTCUSDTmergeddataset.csv, computes log returns, fits EGARCH(1,1), flags variance breaches, buys on breach, exits at +17% TP or −3% SL. Compares equity to buy-and-hold, reports CAGR/Sharpe/max drawdown/win rate, and plots price, breaches, trades, equity. Req: pandas, numpy, matplotlib, arch.
 >>>>>>> 816e9ab1780f2479832faa84dcf6c1be5d8d5a99
+
+## Results
+
+### Strategy Trades
+<img src="images/egarch_trades.png" width="700">
+
+### Equity Curve
+<img src="images/egarch_equity.png" width="700">
+
+### Drawdowns
+<img src="images/egarch_drawdown.png" width="700">
+
+### Returns vs EGARCH Volatility
+<img src="images/egarch_volatility.png" width="700">
