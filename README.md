@@ -83,12 +83,6 @@ The script will:
 
 ---
 
-## 📈 Example Output
-*Example performance plot from a sample run:*
-
-![Example Equity Curve](example_equity_curve.png)
-
----
 
 ## 📝 Notes
 - All thresholds (e.g., TP = 17%, SL = 3%) are defined in `egarch.py` and can be changed.
