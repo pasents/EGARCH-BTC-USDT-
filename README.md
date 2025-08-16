@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 # BTC/USDT EGARCH Variance-Breach Backtest
 
 This project implements and backtests a **variance-breach trading strategy** on BTC/USDT using the **EGARCH(1,1)** volatility model from the `arch` package.
