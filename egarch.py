@@ -204,3 +204,83 @@ plt.savefig(os.path.join(IMG_DIR, "egarch_volatility.png"), dpi=300, bbox_inches
 plt.close()
 
 print("\nSaved plots to:", IMG_DIR)
+
+# ============================================
+# === STRATEGY vs BUY & HOLD – METRICS TABLE
+# ============================================
+
+comparison = pd.DataFrame({
+    "EGARCH Strategy": {
+        "Total Return": df['equity'].iloc[-1] - 1,
+        "CAGR": CAGR,
+        "Sharpe Ratio (weekly)": sharpe_ratio,
+        "Max Drawdown": max_drawdown,
+        "Trades": len(trades_df),
+        "Win Rate": win_rate,
+        "Avg Trade PnL": avg_pnl,
+    },
+    "Buy & Hold": {
+        "Total Return": bh_final - 1,
+        "CAGR": bh_cagr,
+        "Sharpe Ratio (weekly)": bh_sharpe,
+        "Max Drawdown": bh_maxdd,
+        "Trades": np.nan,
+        "Win Rate": np.nan,
+        "Avg Trade PnL": np.nan,
+    }
+})
+
+
+
+# ===== Save CSV (for spreadsheets / post-processing)
+comparison.to_csv(os.path.join(IMG_DIR, "strategy_vs_buyhold.csv"))
+
+# ===== Make a nicely formatted version for README printing and MD export
+percent_rows = {"Total Return", "CAGR", "Max Drawdown", "Win Rate", "Avg Trade PnL"}
+
+def _fmt_cell(idx, val):
+    if pd.isna(val):
+        return "—"
+    if idx in percent_rows:
+        return f"{val*100:.2f}%"
+    if idx == "Trades":
+        return f"{int(val)}"
+    if "Sharpe" in idx:
+        return f"{val:.4f}"
+    return f"{val:.4f}"
+
+formatted = comparison.copy()
+for row in formatted.index:
+    formatted.loc[row, :] = [_fmt_cell(row, v) for v in formatted.loc[row, :].values]
+
+print("\n=== Strategy vs Buy & Hold ===")
+print(formatted.to_markdown())
+
+# ===== Save Markdown fragment (used for README injection)
+md_path = os.path.join(IMG_DIR, "strategy_vs_buyhold.md")
+with open(md_path, "w", encoding="utf-8") as f:
+    f.write("## 📈 Strategy vs Buy & Hold Metrics\n\n")
+    f.write(formatted.to_markdown())
+
+print(f"Saved Markdown metrics table to {md_path}")
+
+# ===== Inject the Markdown fragment into README between tags
+readme_path = "README.md"
+start_tag = "<!--- METRICS_TABLE_START --->"
+end_tag   = "<!--- METRICS_TABLE_END --->"
+
+with open(md_path, "r", encoding="utf-8") as f:
+    metrics_md = f.read()
+
+with open(readme_path, "r", encoding="utf-8") as f:
+    readme = f.read()
+
+if start_tag in readme and end_tag in readme:
+    pre  = readme.split(start_tag)[0]
+    post = readme.split(end_tag)[1]
+    new_readme = pre + start_tag + "\n" + metrics_md + "\n" + end_tag + post
+    with open(readme_path, "w", encoding="utf-8") as f:
+        f.write(new_readme)
+    print(f"Updated {readme_path} with metrics table.")
+else:
+    print("README placeholders not found; skipped injection.")
