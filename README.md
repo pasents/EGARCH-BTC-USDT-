@@ -100,8 +100,6 @@ This project is **not** financial advice. Use at your own risk.
 
 ---
 
-## 📈 Strategy vs Buy & Hold Metrics
-
 <!--- METRICS_TABLE_START --->
 ## 📈 Strategy vs Buy & Hold Metrics
 
