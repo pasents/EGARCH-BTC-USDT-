@@ -38,23 +38,7 @@ A quantitative research implementation of a **variance-breach long strategy** on
 │  ├─ strategy_vs_buyhold.csv
 │  └─ strategy_vs_buyhold.md
 └─ README.md
-
-
----
-
-## 📂 Project Files
-```text
-.
-├─ egarch.py
-├─ BTCUSDTmergeddataset.csv
-├─ images/
-│  ├─ egarch_trades.png
-│  ├─ egarch_equity.png
-│  ├─ egarch_drawdown.png
-│  ├─ egarch_volatility.png
-│  ├─ strategy_vs_buyhold.csv
-│  └─ strategy_vs_buyhold.md
-└─ README.md
+```
 
 ---
 
