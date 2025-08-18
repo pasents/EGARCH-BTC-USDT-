@@ -103,9 +103,6 @@ This project is **not** financial advice. Use at your own risk.
 <!--- METRICS_TABLE_END --->
 
 ---
-<!--- METRICS_TABLE_START --->
-(old metrics will be replaced here)
-<!--- METRICS_TABLE_END --->
 
 ### Strategy Trades
 <img src="images/egarch_trades.png" width="700">
