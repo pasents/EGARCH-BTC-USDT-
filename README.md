@@ -2,7 +2,7 @@
 
 This repository implements and backtests a **variance-breach trading strategy** on BTC/USDT using the **EGARCH(1,1)** volatility model (`arch` library) with **out-of-sample one-step-ahead forecasts** and **next-bar execution**.
 
-## 🔧 Strategy Logic (what actually runs)
+## 🔧 Strategy Logic
 - Fit **EGARCH(1,1)** with Student-t errors to BTC **log returns**.
 - **Re-fit every 30 bars** on an expanding window; use the **one-step-ahead** variance forecast for bar *t*.
 - Flag a **variance breach** when `squared_return_t > forecast_variance_t`.
@@ -39,33 +39,6 @@ This repository implements and backtests a **variance-breach trading strategy** 
 
 
 ---
-
-## 📊 Features
-- EGARCH(1,1) volatility **estimation & forecasting**
-- **Variance-breach** signal generation
-- **Next-bar** entries; TP/vol-stop exits; **fee-aware** PnL
-- Equity curve (strategy & B&H), drawdowns, return series
-- Metrics: **Total Return, CAGR, Sharpe (annualized), Max Drawdown, Trades, Win Rate, Avg Trade PnL**
-- Robustness: **Bootstrap ΔSharpe**, **Jobson–Korkie**, **regime split**, **ESS**
-
----
-
-## 📑 Data Requirements
-CSV must contain:
-- `timestamp` — parsed with **day-first** dates
-- `close` — BTC/USDT close price
-
-Duplicates are removed. The script reports **missing ISO weeks** for awareness.
-
----
-
-## ⚙️ Installation
-```bash
-python -m venv .venv
-# Windows
-.venv\Scripts\activate
-# macOS/Linux
-source .venv/bin/activate
 
 pip install -U pip
 pip install pandas numpy matplotlib arch scipy
