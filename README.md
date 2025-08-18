@@ -1,4 +1,4 @@
-@"
+
 # BTC/USDT — EGARCH Variance-Breach Backtest
 
 A quantitative research implementation of a **variance-breach long strategy** on BTC/USDT. The model uses **EGARCH(1,1)** (Student-t) to produce **out-of-sample one-step-ahead** variance forecasts and executes **next-bar** with **fee-aware** P&L.
