@@ -43,13 +43,16 @@ A quantitative research implementation of a **variance-breach long strategy** on
 ---
 
 ## ⚙️ Installation
+```
 python -m venv .venv
 # Windows: .venv\Scripts\activate
 # macOS/Linux: source .venv/bin/activate
 pip install -U pip
 pip install pandas numpy matplotlib arch scipy
+```
+---
 
-**Optional** `requirements.txt`:
+## requirements.txt`:
 ```
 pandas
 numpy
@@ -67,14 +70,14 @@ python egarch.py
 ---
 
 ##🔑 Key parameters
-
+```
 TP_PCT = 0.08        # 8% take-profit
 ALPHA = 5.2          # volatility-adjusted stop multiplier
 FEE = 0.0005         # 5 bps per side
 RECALC_EVERY = 30    # EGARCH re-fit cadence
 USE_WEEKLY = False   # True = weekly (W-MON), else daily
 
----
+```
 
 ## ⚠️ Disclaimer
 This project is **not** financial advice. Use at your own risk.
