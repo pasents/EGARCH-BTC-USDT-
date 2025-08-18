@@ -1,25 +1,24 @@
+@"
 # BTC/USDT — EGARCH Variance-Breach Backtest
 
 A quantitative research implementation of a **variance-breach long strategy** on BTC/USDT. The model uses **EGARCH(1,1)** (Student-t) to produce **out-of-sample one-step-ahead** variance forecasts and executes **next-bar** with **fee-aware** P&L.
 
-## 🔧 Strategy Logic (concise)
-- **Model:** Fit EGARCH(1,1) with Student-t errors to BTC **log returns** on an expanding window; **re-fit every 30 bars**.
-- **Forecast:** Use the **one-step-ahead** variance forecast available at bar *t*.
-- **Signal (variance breach):** go long when  
-  `squared_return_t > forecast_variance_t`.
+## 🔧 Strategy Logic
+- **Model:** EGARCH(1,1) with Student-t errors on BTC **log returns**; expanding window; **re-fit every 30 bars**.
+- **Forecast:** use the **one-step-ahead** variance forecast available at bar *t*.
+- **Signal (variance breach):** go long when `squared_return_t > forecast_variance_t`.
 - **Execution:** if flat, **enter on the next bar** after the breach (prevents look-ahead).
 - **Exits:**
   - **Take-profit:** **+8%** vs. entry.
-  - **Vol-adjusted stop (log space):** exit when  
-    `log(price/entry) ≤ −α·σ_t`, with **α = 5.2** and **σ_t** the EGARCH-forecasted std. dev.
-- **Costs:** **5 bps per side** applied on entry and exit.
+  - **Vol-adjusted stop (log space):** exit when `log(price/entry) ≤ −α·σ_t`, with **α = 5.2** and **σ_t** the EGARCH-forecasted stdev.
+- **Costs:** **5 bps per side** on entry and exit.
 - **Benchmark:** normalized **buy-and-hold**.
-- **Annualization:** inferred from the timestamp index (defaults: **252** for daily, **52** for weekly).
+- **Annualization:** inferred from the index (typ. **252** daily / **52** weekly).
 
 > **Robustness & Reporting**
 > - Paired **circular block bootstrap** for ΔSharpe (CIs & p-values)  
 > - **Jobson–Korkie** Sharpe difference test (Memmel correction)  
-> - **Pre- vs. Post-2022** regime split metrics  
+> - **Pre- vs Post-2022** regime split metrics  
 > - **Effective sample size (ESS)** for dependent returns  
 > - Sanity checks for **next-bar entry** and **same-bar entry/exit**  
 > - Auto-exported plots and a Markdown **metrics table** injected between README tags
@@ -29,29 +28,69 @@ A quantitative research implementation of a **variance-breach long strategy** on
 ## 📂 Project Files
 ```text
 .
-├─ egarch.py                      # Main backtest script (signals, execution, metrics, plots, README injection)
-├─ BTCUSDTmergeddataset.csv       # Input dataset (timestamp, close) — day-first dates
+├─ egarch.py
+├─ BTCUSDTmergeddataset.csv
 ├─ images/
 │  ├─ egarch_trades.png
 │  ├─ egarch_equity.png
 │  ├─ egarch_drawdown.png
 │  ├─ egarch_volatility.png
 │  ├─ strategy_vs_buyhold.csv
-│  └─ strategy_vs_buyhold.md      # Markdown fragment injected into README
+│  └─ strategy_vs_buyhold.md
 └─ README.md
+
+
+---
+
+## 📂 Project Files
+```text
+.
+├─ egarch.py
+├─ BTCUSDTmergeddataset.csv
+├─ images/
+│  ├─ egarch_trades.png
+│  ├─ egarch_equity.png
+│  ├─ egarch_drawdown.png
+│  ├─ egarch_volatility.png
+│  ├─ strategy_vs_buyhold.csv
+│  └─ strategy_vs_buyhold.md
+└─ README.md
+
+---
+
+## ⚙️ Installation
+python -m venv .venv
+# Windows: .venv\Scripts\activate
+# macOS/Linux: source .venv/bin/activate
+pip install -U pip
+pip install pandas numpy matplotlib arch scipy
+
+**Optional** `requirements.txt`:
+```
+pandas
+numpy
+matplotlib
+arch
 ```
 
 ---
 
-## Key parameters inside egarch.py:
+## ▶️ Usage
+```bash
+python egarch.py
+```
 
 ---
 
+##🔑 Key parameters
+
 TP_PCT = 0.08        # 8% take-profit
-ALPHA = 5.2          # multiplier for volatility-adjusted stop in log space
+ALPHA = 5.2          # volatility-adjusted stop multiplier
 FEE = 0.0005         # 5 bps per side
 RECALC_EVERY = 30    # EGARCH re-fit cadence
-USE_WEEKLY = False   # set True to run on weekly bars (W-MON)
+USE_WEEKLY = False   # True = weekly (W-MON), else daily
+
+---
 
 ## ⚠️ Disclaimer
 This project is **not** financial advice. Use at your own risk.
@@ -77,6 +116,9 @@ This project is **not** financial advice. Use at your own risk.
 <!--- METRICS_TABLE_END --->
 
 ---
+<!--- METRICS_TABLE_START --->
+(old metrics will be replaced here)
+<!--- METRICS_TABLE_END --->
 
 ### Strategy Trades
 <img src="images/egarch_trades.png" width="700">
