@@ -5,15 +5,15 @@ This repository implements and backtests a **variance-breach trading strategy** 
 ## 🔧 Strategy Logic (what actually runs)
 - Fit **EGARCH(1,1)** with Student-t errors to BTC **log returns**.
 - **Re-fit every 30 bars** on an expanding window; use the **one-step-ahead** variance forecast for bar *t*.
-- Flag a **variance breach** when **squared return\_t > forecast variance\_t**.
+- Flag a **variance breach** when `squared_return_t > forecast_variance_t`.
 - If flat, **enter long on the next bar** after a breach (avoids look-ahead).
 - **Exit rules**
   - **Take-profit:** **+8%** relative to entry.
-  - **Vol-adjusted stop:** stop when **log(price/entry) ≤ −α·σ\_t**, with **α = 5.2** and **σ\_t** the EGARCH-forecasted std. dev.
+  - **Vol-adjusted stop:** stop when `log(price/entry) ≤ −α·σ_t`, with **α = 5.2** and **σ_t** the EGARCH-forecasted stdev.
 - **Costs:** **5 bps per side** (spot-like fees) applied on entry and exit.
 - **Benchmark:** Buy-and-hold (normalized).
 
-> The code also includes robustness/reporting utilities:
+> Robustness & reporting utilities included:
 > - Paired **circular block bootstrap** for ΔSharpe (with CIs and p-values)
 > - **Jobson–Korkie** Sharpe difference test (Memmel correction)
 > - **Pre- vs Post-2022** regime split metrics
@@ -24,20 +24,19 @@ This repository implements and backtests a **variance-breach trading strategy** 
 ---
 
 ## 📂 Project Files
-
----
-
+```text
 .
-├─ egarch.py # Main backtest script (signals, execution, metrics, plots, README injection)
-├─ BTCUSDTmergeddataset.csv # Input dataset (timestamp, close) — day-first dates
+├─ egarch.py                      # Main backtest script (signals, execution, metrics, plots, README injection)
+├─ BTCUSDTmergeddataset.csv       # Input dataset (timestamp, close) — day-first dates
 ├─ images/
-│ ├─ egarch_trades.png
-│ ├─ egarch_equity.png
-│ ├─ egarch_drawdown.png
-│ ├─ egarch_volatility.png
-│ ├─ strategy_vs_buyhold.csv
-│ └─ strategy_vs_buyhold.md # Markdown fragment injected into README
+│  ├─ egarch_trades.png
+│  ├─ egarch_equity.png
+│  ├─ egarch_drawdown.png
+│  ├─ egarch_volatility.png
+│  ├─ strategy_vs_buyhold.csv
+│  └─ strategy_vs_buyhold.md      # Markdown fragment injected into README
 └─ README.md
+
 
 ---
 
