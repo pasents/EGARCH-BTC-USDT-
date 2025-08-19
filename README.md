@@ -121,3 +121,5 @@ This project is **not** financial advice. Use at your own risk.
 
 ### Returns vs EGARCH Volatility
 <img src="images/egarch_volatility.png" width="700">
+
+<!-- refresh 2025-08-19T18:23:43 -->
