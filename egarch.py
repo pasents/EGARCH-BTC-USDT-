@@ -9,7 +9,7 @@ from scipy.stats import norm
 # === STRATEGY PARAMS   ===
 # =========================
 TP_PCT        = 0.08     # 8% take-profit
-ALPHA         = 5.2      # multiplier for volatility-adjusted stop (log space)
+ALPHA         = 5.1      # multiplier for volatility-adjusted stop (log space)
 FEE           = 0.0005   # 5 bps per side (spot-like). Tune per venue.
 RECALC_EVERY  = 30       # EGARCH re-fit cadence
 USE_WEEKLY    = False    # set True to run on weekly bars (W-MON)
@@ -31,19 +31,28 @@ def ann_sharpe(r: pd.Series, k: int) -> float:
 
 def infer_annualization(index: pd.DatetimeIndex) -> int:
     if len(index) < 3:
-        return 252
+        return 252  # conservative default
+
     f = pd.infer_freq(index)
     if f:
         f = f.upper()
         if f.startswith("W"):
             return 52
-        if f in ("D", "B"):
+        if f == "B":      # business day frequency
             return 252
+        if f == "D":      # calendar daily (includes weekends)
+            return 365
+
+    # Fallback: infer from spacing and weekend presence
     mdays = np.median(np.diff(index.values).astype("timedelta64[D]").astype(float))
     if 4.0 <= mdays <= 9.0:
         return 52
     if 0.6 <= mdays <= 1.5:
-        return 252
+        # Treat as daily; choose 365 if weekends exist in the index, else 252
+        has_weekends = any(ts.weekday() >= 5 for ts in index)
+        return 365 if has_weekends else 252
+
+    # Final fallback: empirical bars-per-year
     return bars_per_year(index)
 
 def annualized_sharpe_from_returns(r: np.ndarray, freq: int) -> float:
@@ -110,16 +119,8 @@ def effective_sample_size(r: pd.Series, max_lag: int = 20) -> int:
 df_raw = pd.read_csv("BTCUSDTmergeddataset.csv", parse_dates=["timestamp"], dayfirst=True)
 df_raw = df_raw.sort_values("timestamp").set_index("timestamp")
 df_raw = df_raw[~df_raw.index.duplicated(keep="first")]
-
-# ---- choose bar frequency here ----
-if USE_WEEKLY:
-    # weekly bars (last close of each W-MON bucket)
-    df = df_raw.resample("W-MON").last().dropna()
-    ANNUALIZE = 52
-else:
-    # daily bars
-    df = df_raw.copy()
-    ANNUALIZE = 252
+df = df_raw.resample("W-MON").last().dropna() if USE_WEEKLY else df_raw.copy()
+k  = infer_annualization(df.index) 
 
 # compute returns AFTER choosing frequency
 df["log_return"]       = np.log(df["close"]).diff()
@@ -128,10 +129,13 @@ df["squared_returns"]  = df["log_return"] ** 2
 # ======================================
 # === CHECK FOR MISSING WEEKS (period) ==
 # ======================================
-full_weeks   = pd.period_range(df.index.min(), df.index.max(), freq="W-MON")
-have_weeks   = df.index.to_period("W-MON")
-missing_weeks = sorted(set(full_weeks) - set(have_weeks))
-print("Number of missing weeks:", len(missing_weeks))
+if USE_WEEKLY:
+    full_weeks   = pd.period_range(df.index.min(), df.index.max(), freq="W-MON")
+    have_weeks   = df.index.to_period("W-MON")
+    missing_weeks = sorted(set(full_weeks) - set(have_weeks))
+    print("Number of missing weeks:", len(missing_weeks))
+else:
+    missing_weeks = []
 
 # ==================================
 # === EGARCH(1,1) ESTIMATION     ===
@@ -407,7 +411,7 @@ def _fmt_cell(idx, val):
         return f"{val:.4f}"
     return f"{val:.4f}"
 
-formatted = comparison.copy()
+formatted = comparison.copy().astype(object)
 for row in formatted.index:
     formatted.loc[row, :] = [_fmt_cell(row, v) for v in formatted.loc[row, :].values]
 
@@ -478,12 +482,14 @@ print("Next-bar entry violations (only when flat at t-1):", len(violations_flat)
 print("\nBootstrap ΔSharpe (Strategy minus B&H)")
 for label, r1, r2 in [
     ("Full Sample", df["equity"].pct_change(), df["buyhold_equity"].pct_change()),
-    ("Pre-2022",    df.loc[df.index <  "2022-01-01", "equity"].pct_change(),
-                    df.loc[df.index <  "2022-01-01", "buyhold_equity"].pct_change()),
-    ("Post-2022",   df.loc[df.index >= "2022-01-01", "equity"].pct_change(),
-                    df.loc[df.index >= "2022-01-01", "buyhold_equity"].pct_change()),
+    ("Pre-2022",
+        df.loc[df.index <  "2022-01-01", "equity"].pct_change(),
+        df.loc[df.index <  "2022-01-01", "buyhold_equity"].pct_change()),
+    ("Post-2022",
+        df.loc[df.index >= "2022-01-01", "equity"].pct_change(),
+        df.loc[df.index >= "2022-01-01", "buyhold_equity"].pct_change()),
 ]:
-    d, ci, p2, p1 = block_bootstrap_sharpe_diff(r1, r2, freq=infer_annualization(df.index), B=2000, block=10)
+    d, ci, p2, p1 = block_bootstrap_sharpe_diff(r1, r2, freq=k, B=2000, block=10)
     print(f"{label}: ΔSharpe={d:.3f}, 95% CI [{ci[0]:.3f}, {ci[1]:.3f}], p_two={p2:.4f}, p_one(Δ>0)={p1:.4f}")
 
 # Effective sample sizes
@@ -584,12 +590,14 @@ robust_df = pd.DataFrame(robust_rows, columns=["Check", "Result", "Notes"])
 sharpe_tests = []
 for label, r1, r2 in [
     ("Full Sample", df["equity"].pct_change(), df["buyhold_equity"].pct_change()),
-    ("Pre-2022",    df.loc[df.index <  "2022-01-01", "equity"].pct_change(),
-                    df.loc[df.index <  "2022-01-01", "buyhold_equity"].pct_change()),
-    ("Post-2022",   df.loc[df.index >= "2022-01-01", "equity"].pct_change(),
-                    df.loc[df.index >= "2022-01-01", "buyhold_equity"].pct_change()),
+    ("Pre-2022",
+        df.loc[df.index <  "2022-01-01", "equity"].pct_change(),
+        df.loc[df.index <  "2022-01-01", "buyhold_equity"].pct_change()),
+    ("Post-2022",
+        df.loc[df.index >= "2022-01-01", "equity"].pct_change(),
+        df.loc[df.index >= "2022-01-01", "buyhold_equity"].pct_change()),
 ]:
-    d, ci, p2, p1 = block_bootstrap_sharpe_diff(r1, r2, freq=infer_annualization(df.index), B=2000, block=10)
+    d, ci, p2, p1 = block_bootstrap_sharpe_diff(r1, r2, freq=k, B=2000, block=10)
     sharpe_tests.append({
         "Regime": label,
         "Delta_Sharpe": d,
@@ -643,5 +651,318 @@ ROBUST_END    = "<!--- ROBUSTNESS_TABLE_END --->"
 _inject_between_tags(readme_path, METRICS_START, METRICS_END, metrics_md_block)
 _inject_between_tags(readme_path, ROBUST_START, ROBUST_END, robust_md_block)
    
-   
-   
+# ===== Stationary (geometric) bootstrap utilities =====
+import numpy as np
+import pandas as pd
+
+def _stationary_bootstrap_indices(T: int, L: int, rng: np.random.Generator) -> np.ndarray:
+    if T <= 1:
+        return np.arange(T)
+    p = 1.0 / max(1, int(L))
+    idx = np.empty(T, dtype=int)
+    idx[0] = rng.integers(0, T)
+    for t in range(1, T):
+        if rng.random() < p:
+            idx[t] = rng.integers(0, T)           # start new block
+        else:
+            idx[t] = (idx[t-1] + 1) % T           # continue block (circular)
+    return idx
+
+def stationary_bootstrap_sharpe_diff(r1: pd.Series, r2: pd.Series, freq: int,
+                                     B: int = 2000, L: int = 10, seed: int = 42):
+    rng = np.random.default_rng(seed)
+    rr = pd.concat([r1, r2], axis=1, join="inner").dropna()
+    if rr.shape[0] < 5:
+        return np.nan, (np.nan, np.nan), np.nan, np.nan
+    x = rr.iloc[:, 0].to_numpy()
+    y = rr.iloc[:, 1].to_numpy()
+    T = len(rr)
+    def _ann_sharpe(a):
+        a = np.asarray(a)
+        if a.size < 2: return np.nan
+        mu, sd = a.mean(), a.std(ddof=1)
+        return (mu / sd) * np.sqrt(freq) if sd > 0 else np.nan
+    d_obs = _ann_sharpe(x) - _ann_sharpe(y)
+    diffs = np.empty(B)
+    for b in range(B):
+        boot_idx = _stationary_bootstrap_indices(T, L, rng)
+        xb, yb = x[boot_idx], y[boot_idx]
+        diffs[b] = _ann_sharpe(xb) - _ann_sharpe(yb)
+    ci_low, ci_high = np.percentile(diffs, [2.5, 97.5])
+    diffs0 = diffs - diffs.mean()  # center under H0: Δ=0
+    p_two = (np.sum(np.abs(diffs0) >= abs(d_obs)) + 1) / (B + 1)
+    p_one_pos = (np.sum(diffs0 >= d_obs) + 1) / (B + 1)
+    return d_obs, (ci_low, ci_high), p_two, p_one_pos
+
+def stationary_bootstrap_sensitivity(r1, r2, freq, L_list=(5,10,20), B=2000, seed=42):
+    rows = []
+    for L in L_list:
+        d, ci, p2, p1 = stationary_bootstrap_sharpe_diff(r1, r2, freq=freq, B=B, L=L, seed=seed)
+        rows.append({"L (mean block)": L, "ΔSharpe": d, "CI_low": ci[0], "CI_high": ci[1],
+                     "p_two": p2, "p_one(Δ>0)": p1})
+    return pd.DataFrame(rows)
+
+# ===== Run it, print, save, and inject into README =====
+print("\n[SB] Running stationary bootstrap ΔSharpe sensitivity…")  # progress cue
+
+k = infer_annualization(df.index)  # you already computed this above; keep consistent
+r_strat = df["equity"].pct_change().dropna()
+r_bh    = df["buyhold_equity"].pct_change().dropna()
+
+sens = stationary_bootstrap_sensitivity(r_strat, r_bh, freq=k, L_list=[5,10,20], B=2000, seed=42)
+# Nicely formatted print
+with pd.option_context("display.max_columns", None):
+    print("\n[SB] ΔSharpe sensitivity (stationary bootstrap):")
+    print(sens.round(4).to_string(index=False))
+
+# Save markdown + inject
+SB_MD = os.path.join(IMG_DIR, "stationary_bootstrap_sensitivity.md")
+sens_fmt = sens.copy()
+for c in ["ΔSharpe", "CI_low", "CI_high", "p_two", "p_one(Δ>0)"]:
+    sens_fmt[c] = sens_fmt[c].map(lambda x: f"{x:.4f}" if pd.notna(x) else "—")
+with open(SB_MD, "w", encoding="utf-8") as f:
+    f.write("## 🔁 Stationary Bootstrap ΔSharpe Sensitivity\n\n")
+    f.write(sens_fmt.to_markdown(index=False))
+print(f"[SB] Saved sensitivity table to {SB_MD}")
+
+SB_START, SB_END = "<!--- STATIONARY_BOOTSTRAP_START --->", "<!--- STATIONARY_BOOTSTRAP_END --->"
+try:
+    _inject_between_tags("README.md", SB_START, SB_END, open(SB_MD, "r", encoding="utf-8").read())
+except Exception as e:
+    print("[SB] README injection error:", e)
+# ===== Deflated Sharpe Ratio (DSR) =====
+import scipy.stats as st
+
+def _ann_sharpe_from_series(r: pd.Series, freq: int) -> float:
+    r = r.dropna()
+    if r.size < 2:
+        return np.nan
+    mu, sd = r.mean(), r.std(ddof=1)
+    return (mu / sd) * np.sqrt(freq) if sd > 0 else np.nan
+
+def _moments(r: pd.Series):
+    r = r.dropna().values
+    if r.size < 3:
+        return 0.0, 0.0
+    skew = st.skew(r, bias=False)
+    exk  = st.kurtosis(r, fisher=True, bias=False)  # excess kurtosis
+    return skew, exk
+
+def deflated_sharpe_ratio(returns: pd.Series, sr_obs: float, sr_benchmark: float = 0.0, trials: int = 1):
+    """
+    Bailey & López de Prado (2014) style DSR.
+    Inputs:
+      returns      : (periodic) returns used to estimate moments (skew, kurtosis)
+      sr_obs       : observed annualized Sharpe of the 'candidate'
+      sr_benchmark : benchmark Sharpe to compare against (often 0, or B&H SR)
+      trials       : effective number of strategies/parameter sets tried
+    Output:
+      dict with z-score (DSR), p-value, and the moments used
+    """
+    r = returns.dropna().values
+    T = len(r)
+    if T < 5 or not np.isfinite(sr_obs):
+        return {"DSR": np.nan, "p_value": np.nan, "T": T, "skew": np.nan, "ex_kurtosis": np.nan, "trials": trials}
+
+    skew, exk = _moments(pd.Series(r))
+
+    # Mean & variance of Sharpe estimator under H0 (approx)
+    # See BLP: variance depends on skew/kurtosis & sample size.
+    sr_mean = np.sqrt((T - 1) / max(1, (T - 2))) * (sr_obs - sr_benchmark)
+    sr_var  = (1 - skew * sr_mean + ((exk - 1) / 4.0) * sr_mean**2) / max(1, (T - 1))
+    sr_std  = np.sqrt(max(sr_var, 1e-12))
+
+    # Multiple testing: expected max of k Normals ~ Phi^{-1}(1 - 1/k)
+    k = max(1, int(trials))
+    sr_max = sr_mean + sr_std * st.norm.ppf(1 - 1.0 / k)
+
+    z = (sr_obs - sr_max) / sr_std
+    p = 1 - st.norm.cdf(z)
+    return {"DSR": z, "p_value": p, "T": T, "skew": skew, "ex_kurtosis": exk, "trials": k}
+
+print("\n[DSR] Computing Deflated Sharpe Ratios…")
+
+freq = k
+
+# 1) Strategy vs B&H style
+sr_strat = _ann_sharpe_from_series(ret_strat, freq)
+sr_bh    = _ann_sharpe_from_series(ret_bh,    freq)
+
+# <-- IMPORTANT: set this honestly to how many parameter/grid combos you actually tried -->
+N_TRIALS = 20  # adjust to your real search breadth
+
+dsr_rel = deflated_sharpe_ratio(returns=ret_strat, sr_obs=sr_strat, sr_benchmark=sr_bh, trials=N_TRIALS)
+
+# 2) Alpha-series style (r_alpha = r_strat - r_bh, benchmark Sharpe = 0)
+ret_strat_al, ret_bh_al = ret_strat.align(ret_bh, join="inner")
+alpha = (ret_strat_al - ret_bh_al).dropna()
+sr_alpha = _ann_sharpe_from_series(alpha, freq)
+dsr_alpha = deflated_sharpe_ratio(returns=alpha, sr_obs=sr_alpha, sr_benchmark=0.0, trials=N_TRIALS)
+
+# Pretty print
+print("[DSR] Strategy vs B&H:")
+print(f"      SR_strat={sr_strat:.4f}, SR_bh={sr_bh:.4f}, trials={N_TRIALS}")
+print(f"      DSR z={dsr_rel['DSR']:.3f}, p={dsr_rel['p_value']:.4f}, T={dsr_rel['T']}, skew={dsr_rel['skew']:.3f}, exk={dsr_rel['ex_kurtosis']:.3f}")
+
+print("[DSR] Alpha-series (strat - B&H):")
+print(f"      SR_alpha={sr_alpha:.4f}, trials={N_TRIALS}")
+print(f"      DSR z={dsr_alpha['DSR']:.3f}, p={dsr_alpha['p_value']:.4f}, T={dsr_alpha['T']}, skew={dsr_alpha['skew']:.3f}, exk={dsr_alpha['ex_kurtosis']:.3f}")
+
+# Save markdown + inject into README
+DSR_MD = os.path.join(IMG_DIR, "deflated_sharpe_ratio.md")
+import io as _io
+buf = _io.StringIO()
+buf.write("## 🧪 Deflated Sharpe Ratio (DSR)\n\n")
+buf.write(f"- Frequency k = **{freq}**\n")
+buf.write(f"- Assumed trials (tuning breadth) = **{N_TRIALS}**\n\n")
+buf.write("### Strategy vs Buy & Hold\n\n")
+buf.write("| Metric | Value |\n|---|---|\n")
+buf.write(f"| SR_strat | {sr_strat:.4f} |\n")
+buf.write(f"| SR_bh | {sr_bh:.4f} |\n")
+buf.write(f"| DSR z-score | {dsr_rel['DSR']:.3f} |\n")
+buf.write(f"| p-value | {dsr_rel['p_value']:.4f} |\n")
+buf.write(f"| T (obs) | {dsr_rel['T']} |\n")
+buf.write(f"| skew | {dsr_rel['skew']:.3f} |\n")
+buf.write(f"| excess kurtosis | {dsr_rel['ex_kurtosis']:.3f} |\n")
+
+buf.write("\n### Alpha-series (strategy − B&H)\n\n")
+buf.write("| Metric | Value |\n|---|---|\n")
+buf.write(f"| SR_alpha | {sr_alpha:.4f} |\n")
+buf.write(f"| DSR z-score | {dsr_alpha['DSR']:.3f} |\n")
+buf.write(f"| p-value | {dsr_alpha['p_value']:.4f} |\n")
+buf.write(f"| T (obs) | {dsr_alpha['T']} |\n")
+buf.write(f"| skew | {dsr_alpha['skew']:.3f} |\n")
+buf.write(f"| excess kurtosis | {dsr_alpha['ex_kurtosis']:.3f} |\n")
+
+with open(DSR_MD, "w", encoding="utf-8") as f:
+    f.write(buf.getvalue())
+print(f"[DSR] Saved DSR report to {DSR_MD}")
+# ============================================
+# === Alpha vs Beta (CAPM-style regression) ===
+# ============================================
+print("\n[αβ] Running alpha vs beta regression…")
+
+import statsmodels.api as sm
+
+# 1) Align periodic returns (already computed earlier)
+r_strat = df["equity"].pct_change().dropna()
+r_btc   = df["buyhold_equity"].pct_change().dropna()
+ab      = pd.concat([r_strat.rename("r_strat"), r_btc.rename("r_btc")], axis=1).dropna()
+
+y = ab["r_strat"].values
+X = sm.add_constant(ab["r_btc"].values)
+N = len(ab)
+
+# Rule-of-thumb HAC lag: ~ T^(1/3) or based on frequency; keep it simple & transparent
+hac_lags = max(1, int(np.ceil(N ** (1/3))))
+
+ols = sm.OLS(y, X).fit(cov_type="HAC", cov_kwds={"maxlags": hac_lags})
+
+alpha    = float(ols.params[0])           # intercept
+beta     = float(ols.params[1])           # slope on BTC
+t_alpha  = float(ols.tvalues[0])
+p_alpha  = float(ols.pvalues[0])
+t_beta   = float(ols.tvalues[1])
+p_beta   = float(ols.pvalues[1])
+r2       = float(ols.rsquared)
+alpha_ci = ols.conf_int(alpha=0.05)[0].tolist()
+
+# Annualize alpha: per-period intercept * periods-per-year (k already inferred earlier)
+ann_alpha      = alpha * k
+ann_alpha_low  = alpha_ci[0] * k
+ann_alpha_high = alpha_ci[1] * k
+
+print("[αβ] Results:")
+print(f"      alpha (per-period) = {alpha:.6f}  | annualized = {ann_alpha*100:.2f}%")
+print(f"      t_alpha = {t_alpha:.3f}, p_alpha = {p_alpha:.4f}, HAC lags = {hac_lags}")
+print(f"      beta  = {beta:.3f}  (t={t_beta:.3f}, p={p_beta:.4f})")
+print(f"      R^2   = {r2:.4f}, N = {N}")
+
+# ---------- Save Markdown + inject into README ----------
+ALPHA_BETA_MD = os.path.join(IMG_DIR, "alpha_beta_regression.md")
+with open(ALPHA_BETA_MD, "w", encoding="utf-8") as f:
+    f.write("## 📎 Alpha vs Beta Regression (HAC-robust)\n\n")
+    f.write(f"- Periodicity k = **{k}** (annualization)\n")
+    f.write(f"- HAC lags = **{hac_lags}**; N = **{N}**\n\n")
+    f.write("| Metric | Value |\n|---|---|\n")
+    f.write(f"| Alpha (per period) | {alpha:.6f} |\n")
+    f.write(f"| Alpha (annualized) | {ann_alpha*100:.2f}% |\n")
+    f.write(f"| Alpha 95% CI (annualized) | [{ann_alpha_low*100:.2f}%, {ann_alpha_high*100:.2f}%] |\n")
+    f.write(f"| t-stat (alpha) | {t_alpha:.3f} |\n")
+    f.write(f"| p-value (alpha) | {p_alpha:.4f} |\n")
+    f.write(f"| Beta to BTC | {beta:.3f} |\n")
+    f.write(f"| t-stat (beta) | {t_beta:.3f} |\n")
+    f.write(f"| p-value (beta) | {p_beta:.4f} |\n")
+    f.write(f"| R² | {r2:.4f} |\n")
+
+print(f"[αβ] Saved regression table to {ALPHA_BETA_MD}")
+
+AB_START, AB_END = "<!--- ALPHA_BETA_START --->", "<!--- ALPHA_BETA_END --->"
+try:
+    _inject_between_tags("README.md", AB_START, AB_END, open(ALPHA_BETA_MD, "r", encoding="utf-8").read())
+except Exception as e:
+    print("[αβ] README injection error:", e)
+
+DSR_START, DSR_END = "<!--- DSR_START --->", "<!--- DSR_END --->"
+try:
+    _inject_between_tags("README.md", DSR_START, DSR_END, open(DSR_MD, "r", encoding="utf-8").read())
+except Exception as e:
+    print("[DSR] README injection error:", e)
+
+# ================================
+# === Rolling Alpha (robust OLS)
+# ================================
+print("\n[αβ] Computing rolling alpha…")
+
+# Build aligned returns DataFrame from your existing series
+rets = pd.concat(
+    [ret_strat.rename("strat"), ret_bh.rename("btc")],
+    axis=1, join="inner"
+).dropna()
+
+window = 500  # ~1.5 years of daily data; tweak as you like
+
+alphas_ann, betas, dates = [], [], []
+for end in range(window, len(rets) + 1):
+    sub = rets.iloc[end - window:end]
+    y = sub["strat"].values
+    X = sm.add_constant(sub["btc"].values)
+
+    # HAC lag per window (rule of thumb: T^(1/3))
+    hac_lags_win = max(1, int(np.ceil(len(sub) ** (1/3))))
+
+    mdl = sm.OLS(y, X).fit(cov_type="HAC", cov_kwds={"maxlags": hac_lags_win})
+
+    alpha_per_period = float(mdl.params[0])
+    beta_hat         = float(mdl.params[1])
+
+    alphas_ann.append(alpha_per_period * k)  # annualize with your inferred k
+    betas.append(beta_hat)
+    dates.append(sub.index[-1])
+
+# Plot rolling alpha
+plt.figure(figsize=(12, 5))
+plt.plot(dates, alphas_ann, label="Rolling alpha (annualized)")
+plt.axhline(0.0, linestyle="--", linewidth=1)
+plt.title("Rolling Alpha vs BTC (HAC-robust OLS)")
+plt.ylabel("Annualized alpha")
+plt.xlabel("Date")
+plt.grid(True, alpha=0.3)
+plt.legend()
+roll_alpha_path = os.path.join(IMG_DIR, "rolling_alpha.png")
+plt.tight_layout()
+plt.savefig(roll_alpha_path, dpi=150, bbox_inches="tight")
+plt.close()
+print(f"[αβ] Saved rolling alpha plot to {roll_alpha_path}")
+
+# Optional: inject into README between tags
+ROLL_START, ROLL_END = "<!--- ROLLING_ALPHA_START --->", "<!--- ROLLING_ALPHA_END --->"
+roll_md = (
+    "## 🔄 Rolling Alpha vs BTC\n\n"
+    f"Window = **{window}** bars; annualization **k={k}**.\n\n"
+    '<img src="images/rolling_alpha.png" width="700">\n'
+)
+try:
+    _inject_between_tags("README.md", ROLL_START, ROLL_END, roll_md)
+except Exception as e:
+    print("[αβ] README injection (rolling alpha) error:", e)
