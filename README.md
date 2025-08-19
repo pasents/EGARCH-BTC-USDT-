@@ -123,3 +123,5 @@ This project is **not** financial advice. Use at your own risk.
 <img src="images/egarch_volatility.png" width="700">
 
 <!-- refresh 2025-08-19T18:23:43 -->
+
+<!-- refresh 2025-08-19T18:28:57 -->
