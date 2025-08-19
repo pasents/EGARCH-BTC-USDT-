@@ -69,7 +69,7 @@ python egarch.py
 
 ---
 
-##🔑 Key parameters
+## 🔑 Key parameters
 ```
 TP_PCT = 0.08        # 8% take-profit
 ALPHA = 5.2          # volatility-adjusted stop multiplier
@@ -89,23 +89,15 @@ This project is **not** financial advice. Use at your own risk.
 ---
 
 <!--- METRICS_TABLE_START --->
-## 📈 Strategy vs Buy & Hold Metrics
-
-|                              | EGARCH Strategy   | Buy & Hold   |
-|:-----------------------------|:------------------|:-------------|
-| Total Return                 | 6336.94%          | 2722.50%     |
-| CAGR                         | 93.35%            | 69.69%       |
-| Sharpe Ratio (annualize=252) | 1.2503            | 0.9521       |
-| Max Drawdown                 | -54.76%           | -76.63%      |
-| Trades                       | 82                | —            |
-| Win Rate                     | 84.15%            | —            |
-| Avg Trade PnL                | 5.94%             | —            |
+(metrics auto-injected here)
 <!--- METRICS_TABLE_END --->
 
 ---
-<!--- METRICS_TABLE_START --->
-(old metrics will be replaced here)
-<!--- METRICS_TABLE_END --->
+
+<!--- ROBUSTNESS_TABLE_START --->
+(robustness auto-injected here)
+<!--- ROBUSTNESS_TABLE_END --->
+
 
 ### Strategy Trades
 <img src="images/egarch_trades.png" width="700">
@@ -124,3 +116,5 @@ This project is **not** financial advice. Use at your own risk.
 
 ### Returns vs EGARCH Volatility
 <img src="images/egarch_volatility.png" width="700">
+
+!-- refresh $(Get-Date -Format s) -->

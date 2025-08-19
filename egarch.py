@@ -498,3 +498,148 @@ if not trades_df.empty:
     losses = pnl[pnl < 0]
     profit_factor = (wins.sum() / -losses.sum()) if losses.size else np.inf
     print("Profit Factor:", profit_factor, "Mean trade PnL:", pnl.mean(), "Median:", np.median(pnl))
+
+# ============================================
+# === ROBUSTNESS & VALIDATION (tables + README)
+# ============================================
+import io
+
+def _inject_between_tags(readme_path: str, start_tag: str, end_tag: str, md_block: str):
+    """
+    Non-destructive: replace only the FIRST start/end tag pair.
+    If not found, append the tagged block to the end of README.
+    """
+    tagged = f"{start_tag}\n{md_block}\n{end_tag}"
+    if not os.path.exists(readme_path):
+        print("README.md not found; skipped injection.")
+        return
+    with open(readme_path, "r", encoding="utf-8") as f:
+        s = f.read()
+
+    s_start = s.find(start_tag)
+    if s_start == -1:
+        # Append at end
+        with open(readme_path, "a", encoding="utf-8") as f:
+            f.write("\n\n" + tagged + "\n")
+        print(f"Appended section {start_tag}…{end_tag} to README.md")
+        return
+
+    s_end = s.find(end_tag, s_start + len(start_tag))
+    if s_end == -1:
+        # No matching end tag; append safely
+        with open(readme_path, "a", encoding="utf-8") as f:
+            f.write("\n\n" + tagged + "\n")
+        print(f"End tag {end_tag} not found; appended block to README.md")
+        return
+
+    new_s = s[:s_start] + tagged + s[s_end + len(end_tag):]
+    with open(readme_path, "w", encoding="utf-8") as f:
+        f.write(new_s)
+    print(f"Updated README.md section between {start_tag} and {end_tag}")
+
+# ---------- Build ROBUSTNESS table ----------
+# Count forced closes
+forced_closes = int((df["signal"] == -3).sum())
+
+def _yn(x): return "Yes" if bool(x) else "No"
+
+robust_rows = [
+    {"Check": "Transaction costs modeled",
+     "Result": f"{FEE*1e4:.1f} bps per side",
+     "Notes": "Applied on entries and exits."},
+    {"Check": "Execution lag",
+     "Result": "Next-bar",
+     "Notes": "Breach detected at t, enter at t+1 if flat."},
+    {"Check": "Walk-forward re-fitting",
+     "Result": f"EGARCH re-fit every {RECALC_EVERY} bars",
+     "Notes": f"Burn-in={burn_in}; Student-t innovations."},
+    {"Check": "Annualization inference",
+     "Result": f"k={k}",
+     "Notes": "Detected from index frequency/fallback."},
+    {"Check": "Missing weeks (if weekly)",
+     "Result": f"{len(missing_weeks)}",
+     "Notes": "Data integrity check on W-MON grid."},
+    {"Check": "Next-bar entry violations",
+     "Result": f"{int(len(violations))}",
+     "Notes": "Any entry without prior-bar breach."},
+    {"Check": "Next-bar entry violations (flat at t-1 only)",
+     "Result": f"{int(len(violations_flat))}",
+     "Notes": "Stricter condition; should be ~0."},
+    {"Check": "Same-bar entry/exit trades",
+     "Result": f"{int(len(samebar))}",
+     "Notes": "Typically due to forced close."},
+    {"Check": "Forced closes at final bar",
+     "Result": f"{forced_closes}",
+     "Notes": "Honest stats when position open at end."},
+    {"Check": "Effective sample size (returns)",
+     "Result": f"Strat={ess_strat}, B&H={ess_bh}",
+     "Notes": "Accounts for autocorrelation."},
+    {"Check": "Data frequency",
+     "Result": "Weekly (W-MON)" if USE_WEEKLY else "Daily",
+     "Notes": "Controlled via USE_WEEKLY."},
+]
+robust_df = pd.DataFrame(robust_rows, columns=["Check", "Result", "Notes"])
+
+# Capture bootstrap ΔSharpe results into a small table (re-using your loop settings)
+sharpe_tests = []
+for label, r1, r2 in [
+    ("Full Sample", df["equity"].pct_change(), df["buyhold_equity"].pct_change()),
+    ("Pre-2022",    df.loc[df.index <  "2022-01-01", "equity"].pct_change(),
+                    df.loc[df.index <  "2022-01-01", "buyhold_equity"].pct_change()),
+    ("Post-2022",   df.loc[df.index >= "2022-01-01", "equity"].pct_change(),
+                    df.loc[df.index >= "2022-01-01", "buyhold_equity"].pct_change()),
+]:
+    d, ci, p2, p1 = block_bootstrap_sharpe_diff(r1, r2, freq=infer_annualization(df.index), B=2000, block=10)
+    sharpe_tests.append({
+        "Regime": label,
+        "Delta_Sharpe": d,
+        "CI_Low": (ci[0] if isinstance(ci, tuple) or isinstance(ci, list) else np.nan),
+        "CI_High": (ci[1] if isinstance(ci, tuple) or isinstance(ci, list) else np.nan),
+        "p_two_sided": p2,
+        "p_one_sided_pos": p1
+    })
+sharpe_df = pd.DataFrame(sharpe_tests, columns=["Regime", "Delta_Sharpe", "CI_Low", "CI_High", "p_two_sided", "p_one_sided_pos"])
+
+def _fmt3(x):
+    try:
+        return f"{x:.3f}"
+    except Exception:
+        return "—"
+
+for c in ["Delta_Sharpe", "CI_Low", "CI_High", "p_two_sided", "p_one_sided_pos"]:
+    if c in sharpe_df.columns:
+        sharpe_df[c] = sharpe_df[c].apply(_fmt3)
+
+# ---------- Write Markdown fragments (metrics already saved earlier) ----------
+# Metrics fragment: read what you wrote earlier to images/strategy_vs_buyhold.md
+metrics_md_path = os.path.join(IMG_DIR, "strategy_vs_buyhold.md")
+if os.path.exists(metrics_md_path):
+    with open(metrics_md_path, "r", encoding="utf-8") as f:
+        metrics_md_block = f.read()
+else:
+    # Fallback: rebuild a minimal block on the fly
+    metrics_md_block = "## 📈 Strategy vs Buy & Hold Metrics\n\n" + formatted.to_markdown()
+
+# Robustness fragment
+robust_md_path = os.path.join(IMG_DIR, "robustness_checks.md")
+robust_buf = io.StringIO()
+robust_buf.write("## 🛡️ Robustness & Validation Checks\n\n")
+robust_buf.write(robust_df.to_markdown(index=False))
+robust_buf.write("\n\n### Bootstrap ΔSharpe (Strategy − Buy & Hold)\n\n")
+robust_buf.write(sharpe_df.to_markdown(index=False))
+robust_md_block = robust_buf.getvalue()
+with open(robust_md_path, "w", encoding="utf-8") as f:
+    f.write(robust_md_block)
+print(f"Saved Robustness markdown to {robust_md_path}")
+
+# ---------- Inject into README (first matching pair only) ----------
+readme_path = "README.md"
+METRICS_START = "<!--- METRICS_TABLE_START --->"
+METRICS_END   = "<!--- METRICS_TABLE_END --->"
+ROBUST_START  = "<!--- ROBUSTNESS_TABLE_START --->"
+ROBUST_END    = "<!--- ROBUSTNESS_TABLE_END --->"
+
+# Ensure the blocks include headings (so they render nicely in README)
+_inject_between_tags(readme_path, METRICS_START, METRICS_END, metrics_md_block)
+_inject_between_tags(readme_path, ROBUST_START, ROBUST_END, robust_md_block)
+   
