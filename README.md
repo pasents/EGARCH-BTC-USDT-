@@ -9,7 +9,7 @@ A quantitative research implementation of a **variance-breach long strategy** on
 - **Execution:** if flat, **enter on the next bar** after the breach (prevents look-ahead).
 - **Exits:**
   - **Take-profit:** **+8%** vs. entry.
-  - **Vol-adjusted stop (log space):** exit when `log(price/entry) ≤ −α·σ_t`, with **α = 5.1** and **σ_t** the EGARCH-forecast stdev.
+  - **Vol-adjusted stop (log space):** exit when `log(price/entry) ≤ −α·σ_t`, with **α = 5** and **σ_t** the EGARCH-forecast stdev.
 - **Costs:** **5 bps per side** on entry and exit.
 - **Benchmark:** normalized **buy-and-hold**.
 - **Annualization:** inferred from the index (supports **252** business-day, **365** calendar-day, or **52** weekly).
