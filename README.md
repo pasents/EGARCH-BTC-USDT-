@@ -73,7 +73,7 @@ python egarch.py
 ## 🔑 Key parameters
 ```
 TP_PCT = 0.08        # 8% take-profit
-ALPHA = 5.2          # volatility-adjusted stop multiplier
+ALPHA = 5            # volatility-adjusted stop multiplier
 FEE = 0.0005         # 5 bps per side
 RECALC_EVERY = 30    # EGARCH re-fit cadence
 USE_WEEKLY = False   # True = weekly (W-MON), else daily
