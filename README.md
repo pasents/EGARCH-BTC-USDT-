@@ -47,14 +47,15 @@ A quantitative research implementation of a **variance-breach long strategy** on
 ## ⚙️ Installation
 ```
 python -m venv .venv
+
 # Windows: .venv\Scripts\activate
 # macOS/Linux: source .venv/bin/activate
-```
+
 pip install -U pip
 pip install pandas numpy matplotlib arch scipy
 ```
 ---
-```
+
 ## requirements.txt`:
 ```
 pandas
