@@ -9,7 +9,7 @@ from scipy.stats import norm
 # === STRATEGY PARAMS   ===
 # =========================
 TP_PCT        = 0.08     # 8% take-profit
-ALPHA         = 5.1      # multiplier for volatility-adjusted stop (log space)
+ALPHA         = 5        # multiplier for volatility-adjusted stop (log space)
 FEE           = 0.0005   # 5 bps per side (spot-like). Tune per venue.
 RECALC_EVERY  = 30       # EGARCH re-fit cadence
 USE_WEEKLY    = False    # set True to run on weekly bars (W-MON)
