@@ -70,10 +70,9 @@ arch
 ---
 
 ## ▶️ Usage
-
+```
 python egarch.py
 ```
-
 ---
 
 ## 🔑 Key parameters
