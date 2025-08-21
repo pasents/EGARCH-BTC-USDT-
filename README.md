@@ -54,6 +54,9 @@ pip install pandas numpy matplotlib arch scipy
 ---
 
 ## requirements.txt`:
+
+---
+
 ```
 pandas
 numpy
@@ -64,6 +67,10 @@ arch
 ---
 
 ## ▶️ Usage
+
+---
+
+
 ```bash
 python egarch.py
 ```
@@ -73,7 +80,7 @@ python egarch.py
 ## 🔑 Key parameters
 ```
 TP_PCT = 0.08        # 8% take-profit
-ALPHA = 5.2          # volatility-adjusted stop multiplier
+ALPHA = 5            # volatility-adjusted stop multiplier
 FEE = 0.0005         # 5 bps per side
 RECALC_EVERY = 30    # EGARCH re-fit cadence
 USE_WEEKLY = False   # True = weekly (W-MON), else daily
@@ -224,3 +231,56 @@ Window = **500** bars; annualization **k=365**.
 <img src="images/rolling_alpha.png" width="700">
 
 <!--- ROLLING_ALPHA_END --->
+<!--- MONTE_CARLO_START --->
+## 🎲 Monte Carlo Stress Test (auto-updated)
+_Last refreshed: **2025-08-21 20:13 UTC**_
+
+### Results (N=3000)
+- Median Final Equity: 1.87×
+- Median CAGR: 21.04%
+- Median Sharpe: 0.64
+- Median Max DD: -66.58%
+
+**Quantiles**
+- Final Equity — p05: 0.21× · median: 1.87× · p95: 13.19×
+- CAGR — p05: -37.89% · median: 21.04% · p95: 119.15%
+- Sharpe — p05: -0.27 · median: 0.64 · p95: 1.44
+- Max DD — p05: -93.22% · median: -66.58% · p95: -39.06%
+
+**Figures**
+- ![Sample equity curves](images/mc_sample_equity_curves.png)
+
+<!--- MONTE_CARLO_END --->
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
