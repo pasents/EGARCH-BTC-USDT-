@@ -9,7 +9,7 @@ A quantitative research implementation of a **variance-breach long strategy** on
 - **Execution:** if flat, **enter on the next bar** after the breach (prevents look-ahead).
 - **Exits:**
   - **Take-profit:** **+8%** vs. entry.
-  - **Vol-adjusted stop (log space):** exit when `log(price/entry) ≤ −α·σ_t`, with **α = 5.1** and **σ_t** the EGARCH-forecast stdev.
+  - **Vol-adjusted stop (log space):** exit when `log(price/entry) ≤ −α·σ_t`, with **α = 5** and **σ_t** the EGARCH-forecast stdev.
 - **Costs:** **5 bps per side** on entry and exit.
 - **Benchmark:** normalized **buy-and-hold**.
 - **Annualization:** inferred from the index (supports **252** business-day, **365** calendar-day, or **52** weekly).
@@ -40,14 +40,17 @@ A quantitative research implementation of a **variance-breach long strategy** on
 │  ├─ deflated_sharpe_ratio.md
 │  └─ alpha_beta_regression.md
 └─ README.md
+```
 
 ---
 
 ## ⚙️ Installation
 ```
 python -m venv .venv
+
 # Windows: .venv\Scripts\activate
 # macOS/Linux: source .venv/bin/activate
+
 pip install -U pip
 pip install pandas numpy matplotlib arch scipy
 ```
@@ -68,10 +71,6 @@ arch
 
 ## ▶️ Usage
 
----
-
-
-```bash
 python egarch.py
 ```
 
@@ -129,6 +128,8 @@ This project is **not** financial advice. Use at your own risk.
 | Effective sample size (returns)              | Strat=2278, B&H=2093        | Accounts for autocorrelation.               |
 | Data frequency                               | Daily                       | Controlled via USE_WEEKLY.                  |
 
+---
+
 ### Bootstrap ΔSharpe (Strategy − Buy & Hold)
 
 | Regime      |   Delta_Sharpe |   CI_Low |   CI_High |   p_two_sided |   p_one_sided_pos |
@@ -138,6 +139,7 @@ This project is **not** financial advice. Use at your own risk.
 | Post-2022   |          0.241 |   -0.234 |     0.671 |         0.305 |             0.155 |
 <!--- ROBUSTNESS_TABLE_END --->
 
+---
 
 ### Strategy Trades
 <img src="images/egarch_trades.png" width="700">
@@ -157,6 +159,8 @@ This project is **not** financial advice. Use at your own risk.
 ### Returns vs EGARCH Volatility
 <img src="images/egarch_volatility.png" width="700">
 
+---
+
 <!-- refresh 2025-08-19T18:23:43 -->
 
 <!-- refresh 2025-08-19T18:28:57 -->
@@ -172,12 +176,15 @@ This project is **not** financial advice. Use at your own risk.
 |               20 |    0.3611 |  -0.0487 |    0.7648 |   0.083 |       0.0425 |
 <!--- STATIONARY_BOOTSTRAP_END --->
 
+---
 
 <!--- DSR_START --->
 ## 🧪 Deflated Sharpe Ratio (DSR)
 
 - Frequency k = **365**
 - Assumed trials (tuning breadth) = **20**
+
+---
 
 ### Strategy vs Buy & Hold
 
@@ -191,6 +198,8 @@ This project is **not** financial advice. Use at your own risk.
 | skew | 0.425 |
 | excess kurtosis | 5.122 |
 
+---
+
 ### Alpha-series (strategy − B&H)
 
 | Metric | Value |
@@ -201,6 +210,8 @@ This project is **not** financial advice. Use at your own risk.
 | T (obs) | 2306 |
 | skew | 3.107 |
 | excess kurtosis | 94.328 |
+
+---
 
 <!--- DSR_END --->
 <!--- ALPHA_BETA_START --->
@@ -220,6 +231,8 @@ This project is **not** financial advice. Use at your own risk.
 | t-stat (beta) | 13.330 |
 | p-value (beta) | 0.0000 |
 | R² | 0.6755 |
+
+---
 
 <!--- ALPHA_BETA_END --->
 
