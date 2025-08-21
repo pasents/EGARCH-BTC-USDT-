@@ -163,7 +163,6 @@ This project is **not** financial advice. Use at your own risk.
 <!-- refresh 2025-08-19T18:23:43 -->
 
 <!-- refresh 2025-08-19T18:28:57 -->
->>>>>>> 62a07a87014d617fe1964283ec46ef3f46340102
 
 <!--- STATIONARY_BOOTSTRAP_START --->
 ## 🔁 Stationary Bootstrap ΔSharpe Sensitivity
