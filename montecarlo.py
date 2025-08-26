@@ -28,6 +28,12 @@ import matplotlib.pyplot as plt
 from arch import arch_model
 from datetime import datetime, timezone
 
+# --- deterministic paths (avoid CWD issues) ---
+REPO_ROOT   = os.path.dirname(os.path.abspath(__file__))
+README_PATH = os.path.join(REPO_ROOT, "README.md")
+IMG_DIR     = os.path.join(REPO_ROOT, "images")
+os.makedirs(IMG_DIR, exist_ok=True)
+
 # =========
 # Settings
 # =========
@@ -427,12 +433,11 @@ if __name__ == "__main__":
     )
 
     # Build fresh Markdown for README (with timestamp)
-    q  = res_df.quantile([0.05, 0.5, 0.95])
-    ts = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+# --- Build fresh Markdown for README (with timestamp) and inject ---
+ts = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+q = res_df.quantile([0.01, 0.05, 0.5, 0.95, 0.99])
 
-    q = res_df.quantile([0.01, 0.05, 0.5, 0.95, 0.99])
-
-    summary_md = f"""## 🎲 Monte Carlo Stress Test (auto-updated)
+summary_md = f"""## 🎲 Monte Carlo Stress Test (auto-updated: python montecarlo.py --paths {args.paths} --horizon {args.horizon} --start {args.start or 'FULL_SAMPLE'})
 _Last refreshed: **{ts}**_
 
 ### Results (N={len(res_df)})
@@ -447,10 +452,9 @@ _Last refreshed: **{ts}**_
 - Sharpe — p05: {q.loc[0.05,'sharpe']:.2f} · median: {q.loc[0.5,'sharpe']:.2f} · p95: {q.loc[0.95,'sharpe']:.2f}
 - Max DD — p05: {q.loc[0.05,'max_dd']:.2%} · median: {q.loc[0.5,'max_dd']:.2%} · p95: {q.loc[0.95,'max_dd']:.2%}
 
-**Tail probabilities**
-- P(final_equity < 0.5): {(res_df['final_equity'] < 0.5).mean():.3f}
-- P(CAGR < 0): {(res_df['cagr'] < 0).mean():.3f}
-
 **Figures**
 - ![Sample equity curves](images/mc_sample_equity_curves.png)
 """
+
+update_readme_section("MONTE_CARLO", summary_md, readme_path=README_PATH)
+print("[README] wrote Monte Carlo section to:", README_PATH)

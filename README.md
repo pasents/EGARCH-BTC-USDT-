@@ -1,25 +1,32 @@
 # BTC/USDT — EGARCH Variance-Breach Backtest
 
-A quantitative research implementation of a **variance-breach long strategy** on BTC/USDT. The model uses **EGARCH(1,1)** (Student-t) to produce **out-of-sample one-step-ahead** variance forecasts and executes **next-bar** with **fee-aware** P&L.
+A quantitative research implementation of a **variance-breach long strategy** on BTC/USDT.  
+The project combines **EGARCH(1,1)** (Student-t innovations) for **out-of-sample one-step-ahead** variance forecasts with a rule-based long strategy, executed on a **next-bar, fee-aware basis**.
 
 ## 🔧 Strategy Logic
 - **Model:** EGARCH(1,1) with Student-t errors on BTC **log returns**; expanding window; **re-fit every 30 bars**.
-- **Forecast:** use the **one-step-ahead** variance forecast available at bar *t*.
+- **Forecast:** use the **one-step-ahead variance forecast** available at bar *t*.
 - **Signal (variance breach):** go long when `squared_return_t > forecast_variance_t`.
-- **Execution:** if flat, **enter on the next bar** after the breach (prevents look-ahead).
+- **Execution:** if flat, **enter on the next bar** after the breach (prevents look-ahead bias).
 - **Exits:**
-  - **Take-profit:** **+8%** vs. entry.
-  - **Vol-adjusted stop (log space):** exit when `log(price/entry) ≤ −α·σ_t`, with **α = 5** and **σ_t** the EGARCH-forecast stdev.
-- **Costs:** **5 bps per side** on entry and exit.
-- **Benchmark:** normalized **buy-and-hold**.
-- **Annualization:** inferred from the index (supports **252** business-day, **365** calendar-day, or **52** weekly).
+  - **Take-profit:** **+8%** vs. entry price.
+  - **Vol-adjusted stop (log space):** exit when  
+    `log(price/entry) ≤ −α·σ_t`, with **α = 5** and **σ_t** = EGARCH-forecast volatility.
+- **Costs:** **5 bps per side** (applied to all entries and exits).
+- **Benchmark:** normalized **buy-and-hold BTC**.
+- **Annualization:** inferred automatically from the index (supports **252** business-day, **365** calendar-day, or **52** weekly).
 
 > **Robustness & Reporting**
-> - Paired **circular block bootstrap** for ΔSharpe (CIs & p-values)  
-> - **Pre- vs Post-2022** regime split metrics  
-> - **Effective sample size (ESS)** for dependent returns  
+> - Paired **circular block bootstrap** for Sharpe differences (ΔSharpe, CIs & p-values)  
+> - **Pre- vs Post-2021/2022** regime split metrics  
+> - **Stationary bootstrap sensitivity** for ΔSharpe  
+> - **Deflated Sharpe Ratio (DSR)** tests against multiple trials  
+> - **Alpha vs Beta regression** (HAC-robust) + rolling alpha plot  
+> - **Monte Carlo stress tests** (simulated paths with EGARCH dynamics)  
+> - Effective sample size (ESS) checks for dependent returns  
 > - Sanity checks for **next-bar entry** and **same-bar entry/exit**  
-> - Auto-exported plots and Markdown **metrics tables** injected between README tags
+> - Auto-exported plots and Markdown tables injected into `README.md`
+
 
 ---
 
@@ -27,7 +34,9 @@ A quantitative research implementation of a **variance-breach long strategy** on
 ```text
 .
 ├─ egarch.py
+├─ montecarlo.py
 ├─ BTCUSDTmergeddataset.csv
+├─ LICENSE
 ├─ images/
 │  ├─ egarch_trades.png
 │  ├─ egarch_equity.png
@@ -38,41 +47,16 @@ A quantitative research implementation of a **variance-breach long strategy** on
 │  ├─ robustness_checks.md
 │  ├─ stationary_bootstrap_sensitivity.md
 │  ├─ deflated_sharpe_ratio.md
-│  └─ alpha_beta_regression.md
+│  ├─ alpha_beta_regression.md
+│  ├─ mc_results.csv
+│  ├─ mc_final_equity_hist.png
+│  └─ mc_sample_equity_curves.png
 └─ README.md
-```
-
----
-
-## ⚙️ Installation
-```
-python -m venv .venv
-
-# Windows: .venv\Scripts\activate
-# macOS/Linux: source .venv/bin/activate
-
-pip install -U pip
-pip install pandas numpy matplotlib arch scipy
-```
----
-
-## requirements.txt`:
-
----
 
 ```
-pandas
-numpy
-matplotlib
-arch
-```
+## Requirements
+See `requirements.txt` for dependencies.
 
----
-
-## ▶️ Usage
-```
-python egarch.py
-```
 ---
 
 ## 🔑 Key parameters
@@ -127,15 +111,13 @@ This project is **not** financial advice. Use at your own risk.
 | Effective sample size (returns)              | Strat=2278, B&H=2093        | Accounts for autocorrelation.               |
 | Data frequency                               | Daily                       | Controlled via USE_WEEKLY.                  |
 
----
-
 ### Bootstrap ΔSharpe (Strategy − Buy & Hold)
 
 | Regime      |   Delta_Sharpe |   CI_Low |   CI_High |   p_two_sided |   p_one_sided_pos |
 |:------------|---------------:|---------:|----------:|--------------:|------------------:|
 | Full Sample |          0.361 |   -0.066 |     0.788 |         0.097 |             0.05  |
-| Pre-2022    |          0.501 |   -0.24  |     1.278 |         0.204 |             0.102 |
-| Post-2022   |          0.241 |   -0.234 |     0.671 |         0.305 |             0.155 |
+| Pre-2021    |          0.49  |   -0.598 |     1.531 |         0.356 |             0.176 |
+| Post-2021   |          0.36  |   -0.024 |     0.761 |         0.077 |             0.04  |
 <!--- ROBUSTNESS_TABLE_END --->
 
 ---
@@ -160,10 +142,6 @@ This project is **not** financial advice. Use at your own risk.
 
 ---
 
-<!-- refresh 2025-08-19T18:23:43 -->
-
-<!-- refresh 2025-08-19T18:28:57 -->
-
 <!--- STATIONARY_BOOTSTRAP_START --->
 ## 🔁 Stationary Bootstrap ΔSharpe Sensitivity
 
@@ -182,8 +160,6 @@ This project is **not** financial advice. Use at your own risk.
 - Frequency k = **365**
 - Assumed trials (tuning breadth) = **20**
 
----
-
 ### Strategy vs Buy & Hold
 
 | Metric | Value |
@@ -196,8 +172,6 @@ This project is **not** financial advice. Use at your own risk.
 | skew | 0.425 |
 | excess kurtosis | 5.122 |
 
----
-
 ### Alpha-series (strategy − B&H)
 
 | Metric | Value |
@@ -209,9 +183,8 @@ This project is **not** financial advice. Use at your own risk.
 | skew | 3.107 |
 | excess kurtosis | 94.328 |
 
----
-
 <!--- DSR_END --->
+
 <!--- ALPHA_BETA_START --->
 ## 📎 Alpha vs Beta Regression (HAC-robust)
 
@@ -230,8 +203,6 @@ This project is **not** financial advice. Use at your own risk.
 | p-value (beta) | 0.0000 |
 | R² | 0.6755 |
 
----
-
 <!--- ALPHA_BETA_END --->
 
 <!--- ROLLING_ALPHA_START --->
@@ -242,54 +213,27 @@ Window = **500** bars; annualization **k=365**.
 <img src="images/rolling_alpha.png" width="700">
 
 <!--- ROLLING_ALPHA_END --->
-<!--- MONTE_CARLO_START --->
-## 🎲 Monte Carlo Stress Test (auto-updated)
-_Last refreshed: **2025-08-21 20:13 UTC**_
 
-### Results (N=3000)
-- Median Final Equity: 1.87×
-- Median CAGR: 21.04%
-- Median Sharpe: 0.64
-- Median Max DD: -66.58%
+<!--- MONTE_CARLO_START --->
+## 🎲 Monte Carlo Stress Test (auto-updated: python montecarlo.py --paths 5000 --horizon 365 --start 2021-03-01)
+_Last refreshed: **2025-08-26 23:01 UTC**_
+
+### Results (N=5000)
+- Median Final Equity: 1.17×
+- Median CAGR: 10.42%
+- Median Sharpe: 0.47
+- Median Max DD: -50.39%
 
 **Quantiles**
-- Final Equity — p05: 0.21× · median: 1.87× · p95: 13.19×
-- CAGR — p05: -37.89% · median: 21.04% · p95: 119.15%
-- Sharpe — p05: -0.27 · median: 0.64 · p95: 1.44
-- Max DD — p05: -93.22% · median: -66.58% · p95: -39.06%
+- Final Equity — p01: 0.15× · p05: 0.32× · median: 1.17× · p95: 3.73× · p99: 7.04×
+- CAGR — p01: -70.25% · p05: -51.71% · median: 10.42% · p95: 134.02% · p99: 252.67%
+- Sharpe — p05: -0.88 · median: 0.47 · p95: 1.73
+- Max DD — p05: -81.55% · median: -50.39% · p95: -26.70%
 
 **Figures**
 - ![Sample equity curves](images/mc_sample_equity_curves.png)
 
 <!--- MONTE_CARLO_END --->
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 

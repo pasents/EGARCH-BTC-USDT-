@@ -503,12 +503,12 @@ print("Next-bar entry violations (only when flat at t-1):", len(violations_flat)
 print("\nBootstrap ΔSharpe (Strategy minus B&H)")
 for label, r1, r2 in [
     ("Full Sample", df["equity"].pct_change(), df["buyhold_equity"].pct_change()),
-    ("Pre-2022",
-        df.loc[df.index <  "2022-01-01", "equity"].pct_change(),
-        df.loc[df.index <  "2022-01-01", "buyhold_equity"].pct_change()),
-    ("Post-2022",
-        df.loc[df.index >= "2022-01-01", "equity"].pct_change(),
-        df.loc[df.index >= "2022-01-01", "buyhold_equity"].pct_change()),
+    ("Pre-2021",
+        df.loc[df.index <  "2021-03-01", "equity"].pct_change(),
+        df.loc[df.index <  "2021-03-01", "buyhold_equity"].pct_change()),
+    ("Post-2021",
+        df.loc[df.index >= "2021-03-01", "equity"].pct_change(),
+        df.loc[df.index >= "2021-03-01", "buyhold_equity"].pct_change()),
 ]:
     d, ci, p2, p1 = block_bootstrap_sharpe_diff(r1, r2, freq=k, B=2000, block=10)
     print(f"{label}: ΔSharpe={d:.3f}, 95% CI [{ci[0]:.3f}, {ci[1]:.3f}], p_two={p2:.4f}, p_one(Δ>0)={p1:.4f}")
@@ -611,12 +611,12 @@ robust_df = pd.DataFrame(robust_rows, columns=["Check", "Result", "Notes"])
 sharpe_tests = []
 for label, r1, r2 in [
     ("Full Sample", df["equity"].pct_change(), df["buyhold_equity"].pct_change()),
-    ("Pre-2022",
-        df.loc[df.index <  "2022-01-01", "equity"].pct_change(),
-        df.loc[df.index <  "2022-01-01", "buyhold_equity"].pct_change()),
-    ("Post-2022",
-        df.loc[df.index >= "2022-01-01", "equity"].pct_change(),
-        df.loc[df.index >= "2022-01-01", "buyhold_equity"].pct_change()),
+    ("Pre-2021",
+        df.loc[df.index <  "2021-03-01", "equity"].pct_change(),
+        df.loc[df.index <  "2021-03-01", "buyhold_equity"].pct_change()),
+    ("Post-2021",
+        df.loc[df.index >= "2021-03-01", "equity"].pct_change(),
+        df.loc[df.index >= "2021-03-01", "buyhold_equity"].pct_change()),
 ]:
     d, ci, p2, p1 = block_bootstrap_sharpe_diff(r1, r2, freq=k, B=2000, block=10)
     sharpe_tests.append({
