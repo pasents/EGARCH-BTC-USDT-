@@ -54,6 +54,9 @@ The project combines **EGARCH(1,1)** (Student-t innovations) for **out-of-sample
 └─ README.md
 
 ```
+
+---
+
 ## Requirements
 See `requirements.txt` for dependencies.
 
@@ -116,8 +119,8 @@ This project is **not** financial advice. Use at your own risk.
 | Regime      |   Delta_Sharpe |   CI_Low |   CI_High |   p_two_sided |   p_one_sided_pos |
 |:------------|---------------:|---------:|----------:|--------------:|------------------:|
 | Full Sample |          0.361 |   -0.066 |     0.788 |         0.097 |             0.05  |
-| Pre-2021    |          0.49  |   -0.598 |     1.531 |         0.356 |             0.176 |
-| Post-2021   |          0.36  |   -0.024 |     0.761 |         0.077 |             0.04  |
+| Pre-2020    |          0.32  |   -0.921 |     1.653 |         0.616 |             0.306 |
+| Post-2020   |          0.368 |   -0.086 |     0.814 |         0.107 |             0.055 |
 <!--- ROBUSTNESS_TABLE_END --->
 
 ---
@@ -235,6 +238,22 @@ _Last refreshed: **2025-08-26 23:01 UTC**_
 
 <!--- MONTE_CARLO_END --->
 
+## Train / Validation / Test Protocol
+
+- **Train:** 2019-01-01 → 2020-12-31  
+- **Validation:** 2021-01-01 → 2022-12-31  
+- **Test (Out-of-Sample):** 2023-01-01 → 2025-08-29  
+- **Embargo:** 5 bars at each boundary.
+
+**Why these periods?**
+- **2019–2020 (Train):** mixed/sideways markets with modest uptrends expose EGARCH to low–mid volatility regimes and multiple mini-cycles.
+- **2021–2022 (Validation):** a wild bull (2021) followed by a deep bear (2022) lets us tune hyperparameters (TP %, stop k·σ, refit cadence) for robustness across opposite regimes.
+- **2023–present (Test):** recovery to new ATHs with more stepwise, non-parabolic advances represents a structurally different cycle; we keep hyperparameters frozen and evaluate once on this unseen period.
+
+**Protocol details**
+- We **tune only on validation** and pick configurations that sit on **robust plateaus**, not single maxima.
+- EGARCH parameters are **re-estimated walk-forward** (expanding window) using only past data at each step; orders execute on the next bar.
+- The **test set** remains untouched until the end and is evaluated in a **single pass**.
 
 
 
