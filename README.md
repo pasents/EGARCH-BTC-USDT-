@@ -35,6 +35,7 @@ The project combines **EGARCH(1,1)** (Student-t innovations) for **out-of-sample
 .
 ├─ egarch.py
 ├─ montecarlo.py
+├─ research_splits.py
 ├─ BTCUSDTmergeddataset.csv
 ├─ LICENSE
 ├─ images/
@@ -51,7 +52,14 @@ The project combines **EGARCH(1,1)** (Student-t innovations) for **out-of-sample
 │  ├─ mc_results.csv
 │  ├─ mc_final_equity_hist.png
 │  └─ mc_sample_equity_curves.png
+├─ results/
+│  └─ splits/
+│     ├─ train.csv
+│     ├─ validation.csv
+│     ├─ test.csv
+│     └─ README_split_snippet.md
 └─ README.md
+
 
 ```
 
